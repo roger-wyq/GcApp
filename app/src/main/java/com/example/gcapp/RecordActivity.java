@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
@@ -22,7 +23,7 @@ import java.io.IOException;
 import java.util.Timer;
 import java.util.TimerTask;
 
-public class MainActivity extends AppCompatActivity {
+public class RecordActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
@@ -65,7 +66,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
         }
         if(!permissionToRecordAccepted){
-            Toast.makeText(MainActivity.this, "未获得录音权限，程序退出！", Toast.LENGTH_LONG).show();
+            Toast.makeText(RecordActivity.this, "未获得录音权限，程序退出！", Toast.LENGTH_LONG).show();
             finish();
         }
     }
@@ -239,10 +240,16 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_record);
+
+        Intent intent = getIntent();
+        String name = intent.getStringExtra("user_name");
 
         recordFileName = getExternalCacheDir().getAbsolutePath();
-        recordFileName += "/recordfile.3gp";
+        recordFileName += ("/" + name + ".3gp");
+
+        Log.e(TAG, "onCreate: " + recordFileName);
+        ///storage/emulated/0/Android/data/com.example.gcapp/cache/Roget.3gp
 
         ActivityCompat.requestPermissions(this, permissions, REQUEST_RECORD_AUDIO_PERMISSION);
 
