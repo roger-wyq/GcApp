@@ -1,6 +1,7 @@
 package com.example.gcapp;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 
@@ -9,17 +10,23 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.os.SystemClock;
+import android.text.method.ScrollingMovementMethod;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.Button;
-import android.widget.Chronometer;
-import android.widget.SeekBar;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.IOException;
+import java.text.DecimalFormat;
 import java.util.Timer;
 import java.util.TimerTask;
 
@@ -28,34 +35,67 @@ public class RecordActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
     private static final int REQUEST_RECORD_AUDIO_PERMISSION = 200;
     private static String recordFileName = null;
+    private static final int NOCONFIRM = 1;
+    private static final int CONFIRM = 2;
+    private int statu = NOCONFIRM;
+    private int step = 1;
+    private int questionNum = 1;
 
-    // 录音键和播放键
+    // 录音键
     private Button recordButton = null;
-    private Button playButton = null;
-
-    // 录音器和播放器
+    // 录音器
     private MediaRecorder recorder = null;
+    //播放器
     private MediaPlayer player = null;
-
-    // 录音计时器
-    Chronometer chronometer = null;
-
-    /*
-     *进度条相关
-     */
-    protected SeekBar seekBar = null;//进度条
-    private Timer timer = null;//定时器
-    protected TextView tv_start = null;//开始时间
-    protected TextView tv_end = null;//结束时间
-    private boolean isSeekbarChaning;//互斥变量，防止进度条和定时器冲突。
+    //显示图片和文字
+    private LinearLayout fmLayout;
+    private ImageView img;
+    private TextView textView;
+    // 计时工具
+    private TextView timer;
+    private long baseTimer;
+    // 信息
+    private String name, age, gender;
 
 
+    private TextView title = null;
+    private TextView tip = null;
 
-    boolean mStartPlaying = true;
+
     boolean mStartRecording = true;
 
     private boolean permissionToRecordAccepted = false;   // 表示是否获得录音权限;
     private String[] permissions = {Manifest.permission.RECORD_AUDIO};
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        if (getSupportActionBar() != null){
+            getSupportActionBar().hide();
+        }
+        setContentView(R.layout.activity_record);
+
+        Intent intent = getIntent();
+        name = intent.getStringExtra("user_name");
+        age = intent.getStringExtra("user_age");
+        gender = intent.getStringExtra("user_gender");
+        Log.e(TAG, "onCreate: " + name + age + gender);
+        recordFileName = getExternalCacheDir().getAbsolutePath();
+        recordFileName += ("/" + name + age + gender);
+        ActivityCompat.requestPermissions(this, permissions, REQUEST_RECORD_AUDIO_PERMISSION);
+        initView();
+    }
+
+    // 程序结束时释放资源
+    @Override
+    protected void onStop() {
+        super.onStop();
+        if(recorder != null){
+            recorder.release();
+            recorder = null;
+        }
+
+    }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
@@ -79,45 +119,8 @@ public class RecordActivity extends AppCompatActivity {
         }
     }
 
-    private void onPlay(boolean start){
-        if(start){
-            startPlaying();
-        } else {
-            stopPlaying();
-        }
-    }
-
-    private void stopPlaying() {
-        timer.cancel();
-        player.release();
-        player = null;
-        Log.d(TAG, "stopPlaying: ???");
-    }
-
-    private void startPlaying() {
-        player = new MediaPlayer();
-        try {
-            player.setDataSource(recordFileName);
-            player.prepare();
-            player.start();
-        }catch (IOException e){
-            Log.e(TAG, "startPlaying");
-        }
-        int duration = player.getDuration();
-        seekBar.setMax(duration);
-        timer = new Timer();
-        timer.schedule(new TimerTask() {
-            @Override
-            public void run() {
-                if(!isSeekbarChaning){
-                    seekBar.setProgress(player.getCurrentPosition());
-                }
-            }
-        },0, 50);
-    }
 
     private void stopRecording() {
-        chronometer.stop();
         recorder.stop();
         recorder.release();
         recorder = null;
@@ -127,148 +130,182 @@ public class RecordActivity extends AppCompatActivity {
         recorder = new MediaRecorder();
         recorder.setAudioSource(MediaRecorder.AudioSource.MIC);
         recorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
-        recorder.setOutputFile(recordFileName);
+        recorder.setOutputFile(String.format("%s%s.3gp", recordFileName, questionNum));
+        questionNum++;
         recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
-
         try {
             recorder.prepare();
         }catch (IOException e){
             Log.e(TAG, "startRecording: prepare() failed");
         }
-        chronometer.setBase(SystemClock.elapsedRealtime());
-        chronometer.start();
         recorder.start();
     }
 
-    /*
-     *计算播放时间
-     */
-    private String calculateTime(int time){
-        int minute;
-        int second;
-        String timeStr = "";
-        if(time >= 60){
-            minute = time / 60;
-            second = time % 60;
-            if(minute >= 0 && minute < 10) {
-                timeStr += ("0" + minute);
-            }else {
-                timeStr += minute;
-            }
-            if(second >= 0 && second < 10) {
-                timeStr += (":0" + second);
-            }else {
-                timeStr += (":" + second);
-            }
-        }else {
-            timeStr += "00:";
-            second = time;
-            if(second >= 0 && second < 10) {
-                timeStr += ("0" + second);
-            }else {
-                timeStr += second;
-            }
-        }
-        return timeStr;
+    private void startPlay(){
+        player = new MediaPlayer();
+        Log.e(TAG, "startPlay: " + questionNum);
+        int id = getApplication().getResources().getIdentifier("question" + questionNum,
+                "raw", getApplicationContext().getPackageName());
+        player = MediaPlayer.create(RecordActivity.this, id);
+
+        player.start();
+    }
+
+
+
+    private  void enterStep2(){
+        step = 2;
+        title.setText("STEP2 图片描述");
+        tip.setText(R.string.step2_prompt);
+        fmLayout.removeAllViews();
+        addimg(R.mipmap.img1);
+    }
+
+    private void enterStep3(){
+        step = 3;
+        title.setText("STEP3 短文朗读");
+        tip.setText(R.string.step3_prompt);
+        //getSupportFragmentManager().beginTransaction().replace(R.id.frame, new Fragment2()).commit();
+        fmLayout.removeAllViews();
+        addtxt(R.string.text);
+        textView.setMovementMethod(ScrollingMovementMethod.getInstance());
+    }
+
+    private void enterStep4(){
+        step = 4;
+        title.setText("STEP3 词汇朗读");
+        tip.setText(R.string.step3_prompt);
+        fmLayout.removeAllViews();
+        addtxt(R.string.words1);
+    }
+
+    private void enterStep5(){
+        step = 5;
+        title.setText("STEP5 主题统觉测试");
+        tip.setText(R.string.step5_prompt);
+        fmLayout.removeAllViews();
+        addimg(R.mipmap.tat);
     }
 
     /*
      *初始化界面
      */
     private void initView(){
-        playButton = (Button) findViewById(R.id.play);
         recordButton = (Button) findViewById(R.id.record);
-        chronometer = (Chronometer) findViewById(R.id.chr);
-        seekBar = (SeekBar) findViewById(R.id.seekbar);
-        tv_end = (TextView) findViewById(R.id.tv_end);
-        tv_start = (TextView) findViewById(R.id.tv_start);
+        tip = findViewById(R.id.textView);
+        title = findViewById(R.id.steptitle);
+        fmLayout = findViewById(R.id.LinL);
 
-        /*
-         *为录音键和播放键添加点击事件监听
-         */
-        playButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                onPlay(mStartPlaying);
-                if(mStartPlaying){
-                    playButton.setText("停止播放");
-                } else {
-                    playButton.setText("开始播放");
-                }
-                mStartPlaying = !mStartPlaying;
-            }
-        });
-
+        addtxt(R.string.question1);
         recordButton.setOnClickListener(new View.OnClickListener() {
+            @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
             @Override
             public void onClick(View v) {
-                onRecord(mStartRecording);
-                if(mStartRecording){
-                    recordButton.setText("停止录音");
-                } else {
-                    recordButton.setText("开始录音");
+                if(statu == NOCONFIRM){
+                    statu = CONFIRM;
+                    startPlay();
+                    recordButton.setText("开始回答");
                 }
-                mStartRecording = !mStartRecording;
+                else {
+                    onRecord(mStartRecording);
+                    if (mStartRecording) {
+                        // 计时
+                        RecordActivity.this.baseTimer = SystemClock.elapsedRealtime();
+                        timer = (TextView) findViewById(R.id.timer);
+                        final Handler startTimehandler = new Handler(){
+                            public void handleMessage(android.os.Message msg) {
+                                if (null != timer) {
+                                    timer.setText((String) msg.obj);
+                                }
+                            }
+                        };
+                        new Timer("录音计时").scheduleAtFixedRate(new TimerTask() {
+                            @Override
+                            public void run() {
+                                int time = (int) ((SystemClock.elapsedRealtime() - RecordActivity.this.baseTimer) / 1000);
+                                //String hh = new DecimalFormat("00").format(time / 3600);
+                                String mm = new DecimalFormat("00").format(time % 3600 / 60);
+                                String ss = new DecimalFormat("00").format(time % 60);
+                                String timeFormat = new String( mm + ":" + ss);
+                                Message msg = new Message();
+                                msg.obj = timeFormat;
+                                startTimehandler.sendMessage(msg);
+                            }
+
+                        }, 0, 1000L);
+                        recordButton.setText("完成");
+                    } else {
+                        timer.setText("00:00");
+                        timer = null;
+                        Log.e(TAG, "onClick: " + questionNum );
+                        if(questionNum <= 9)
+                            recordButton.setText("开始回答");
+                        else
+                            recordButton.setText("开始");
+                        if(step == 1) {
+                            if (questionNum <= 9) {
+                                int id = getApplication().getResources().getIdentifier("question" + (questionNum),
+                                        "string", getApplicationContext().getPackageName());
+                                textView.setText(id);
+                                textView.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
+                                textView.setTextSize(15);
+                                startPlay();
+                            }
+                            else
+                               enterStep2();
+                        } else if(step == 2){
+                            if(questionNum <= 12){
+                                int id = getApplication().getResources().getIdentifier("img" + (questionNum - 9),
+                                        "mipmap", getApplicationContext().getPackageName());
+                                img.setImageDrawable(getDrawable(id));
+                            } else
+                                enterStep3();
+                        } else if(step == 3){
+                                enterStep4();
+                        } else if (step == 4) {
+                            if(questionNum <= 16) {
+                                int id = getApplication().getResources().getIdentifier("words" + (questionNum - 13),
+                                        "string", getApplicationContext().getPackageName());
+                                textView.setText(id);
+                                textView.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
+                                textView.setTextSize(15);
+                                Log.e(TAG, "onClick: "+questionNum);
+                            } else {
+                                enterStep5();
+                            }
+                        } else if(step == 5) {
+                            Intent intent = new Intent(RecordActivity.this, ReportActivity.class);
+                            intent.putExtra("user_name", name);
+                            intent.putExtra("user_age", age);
+                            intent.putExtra("user_gender", gender);
+                            startActivity(intent);
+                        }
+                    }
+                    mStartRecording = !mStartRecording;
+                }
             }
         });
-
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if(player != null) {
-                    int duration2 = player.getDuration();
-                    int position = player.getCurrentPosition();
-                    tv_start.setText(calculateTime(position / 1000));
-                    tv_end.setText(calculateTime(duration2 / 1000));
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-                isSeekbarChaning = true;
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-                isSeekbarChaning = false;
-                player.seekTo(seekBar.getProgress());
-                tv_start.setText(calculateTime(player.getCurrentPosition() / 1000));
-            }
-        });
     }
 
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
-        super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_record);
-
-        Intent intent = getIntent();
-        String name = intent.getStringExtra("user_name");
-
-        recordFileName = getExternalCacheDir().getAbsolutePath();
-        recordFileName += ("/" + name + ".3gp");
-
-        Log.e(TAG, "onCreate: " + recordFileName);
-        ///storage/emulated/0/Android/data/com.example.gcapp/cache/Roget.3gp
-
-        ActivityCompat.requestPermissions(this, permissions, REQUEST_RECORD_AUDIO_PERMISSION);
-
-        initView();
+    private void addimg(int id) {
+        img = new ImageView(this);
+        img.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT));  //设置图片宽高
+        img.setImageResource(id);
+        fmLayout.addView(img);
 
     }
 
-    // 程序结束时释放资源
-    @Override
-    protected void onStop() {
-        super.onStop();
-        if(recorder != null){
-            recorder.release();
-            recorder = null;
-        }
-
-        if(player != null){
-            player.release();
-            player = null;
-        }
+    private void addtxt(int id) {
+        textView = new TextView(this);
+        textView.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT));
+        textView.setText(id);
+        textView.setGravity(Gravity.CENTER_HORIZONTAL | Gravity.CENTER_VERTICAL);
+        textView.setTextSize(15);
+        fmLayout.addView(textView);
     }
+
+
+
 }

@@ -17,6 +17,7 @@ public class infoSelectActivity extends AppCompatActivity {
     private EditText EditText_age = null;
     private Spinner Spinner_gender = null;
     private Button Button_confirm = null;
+    private Button Button_back = null;
 
     private String name;
     private String age;
@@ -27,6 +28,7 @@ public class infoSelectActivity extends AppCompatActivity {
         EditText_age = (EditText) findViewById(R.id.editText_age);
         Spinner_gender = (Spinner) findViewById(R.id.spinner_gender);
         Button_confirm = (Button) findViewById(R.id.button_confirm);
+        Button_back = (Button) findViewById(R.id.buttonBack);
 
         Button_confirm.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -45,10 +47,17 @@ public class infoSelectActivity extends AppCompatActivity {
             }
         });
 
+        Button_back.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                onBackPressed();
+            }
+        });
+
     }
 
     private void enterMain(){
-        Intent intent = new Intent(infoSelectActivity.this, RecordActivity.class);
+        Intent intent = new Intent(infoSelectActivity.this, ConfirmRecordActivity.class);
         intent.putExtra("user_name", name);
         intent.putExtra("user_age", age);
         intent.putExtra("user_gender", gender);
@@ -58,6 +67,9 @@ public class infoSelectActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if (getSupportActionBar() != null){
+            getSupportActionBar().hide();
+        }
         setContentView(R.layout.activity_info_select);
         initView();
     }
