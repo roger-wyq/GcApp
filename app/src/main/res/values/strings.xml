@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">GcApp</string>
+    <string name="app_name">语音数据收集</string>
     <string name="record_prompt">
         本软件接下来将收集您的语音数据供此项研究使用，请确认您已签署知情同意书。\n
         本次测试分为五个部分：\n

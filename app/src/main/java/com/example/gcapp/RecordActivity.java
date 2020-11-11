@@ -4,7 +4,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
-
 import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -24,7 +23,6 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
-
 import java.io.IOException;
 import java.text.DecimalFormat;
 import java.util.Timer;
@@ -94,7 +92,6 @@ public class RecordActivity extends AppCompatActivity {
             recorder.release();
             recorder = null;
         }
-
     }
 
     @Override
@@ -142,6 +139,8 @@ public class RecordActivity extends AppCompatActivity {
     }
 
     private void startPlay(){
+        if(player != null)
+            player.stop();
         player = new MediaPlayer();
         Log.e(TAG, "startPlay: " + questionNum);
         int id = getApplication().getResources().getIdentifier("question" + questionNum,
@@ -153,7 +152,7 @@ public class RecordActivity extends AppCompatActivity {
 
 
 
-    private  void enterStep2(){
+    private void enterStep2(){
         step = 2;
         title.setText("STEP2 图片描述");
         tip.setText(R.string.step2_prompt);
@@ -165,7 +164,7 @@ public class RecordActivity extends AppCompatActivity {
         step = 3;
         title.setText("STEP3 短文朗读");
         tip.setText(R.string.step3_prompt);
-        //getSupportFragmentManager().beginTransaction().replace(R.id.frame, new Fragment2()).commit();
+
         fmLayout.removeAllViews();
         addtxt(R.string.text);
         textView.setMovementMethod(ScrollingMovementMethod.getInstance());
@@ -173,7 +172,7 @@ public class RecordActivity extends AppCompatActivity {
 
     private void enterStep4(){
         step = 4;
-        title.setText("STEP3 词汇朗读");
+        title.setText("STEP4 词汇朗读");
         tip.setText(R.string.step3_prompt);
         fmLayout.removeAllViews();
         addtxt(R.string.words1);
@@ -231,7 +230,6 @@ public class RecordActivity extends AppCompatActivity {
                                 msg.obj = timeFormat;
                                 startTimehandler.sendMessage(msg);
                             }
-
                         }, 0, 1000L);
                         recordButton.setText("完成");
                     } else {
